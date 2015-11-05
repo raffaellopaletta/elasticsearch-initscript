@@ -1,0 +1,1 @@
+PATH=`echo $PATH:/usr/java/jre1.7.0_03/bin`

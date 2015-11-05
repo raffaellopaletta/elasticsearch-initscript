@@ -1,0 +1,107 @@
+#!/bin/bash
+#
+# Copyright (C) 2015 Raffaello Paletta <raffaellopaletta@gmail.com>
+#
+# This is open source software, licensed under the MIT License. See the file LICENSE for details.	
+#
+
+### BEGIN INIT INFO
+# Provides: elasticsearch
+# Required-Start: 
+# Required-Stop: 
+# Should-Start:
+# Should-Stop:
+# Default-Start: 3 4 5
+# Default-Stop: 0 1 2 6
+# Short-Description: Startup/Shutdown Elastic Search 
+# Description: Start and stop one or more nodes (instances) of Elastic Search
+### END INIT INFO
+
+ES_HOME="/usr/local/share/elasticsearch-2.0.0" 	# Elastic Search home
+ES_RUN=$ES_HOME/run								# Elastic Search pid files path
+ES_LOGS=$ES_HOME/logs							# Elastic Search log files path
+MAX_NODES=3										# Max number of instances that this script can launch
+
+NAME="elasticsearch"
+DAEMON=$ES_HOME/bin/$NAME
+
+loadDefault() {
+	
+	[ -f /etc/default/$NAME ] && . /etc/default/$NAME	
+}
+
+countNodes() {
+	
+	NODES=`find $ES_RUN -type f | wc -l`
+}
+
+case "$1" in
+start)
+	
+	loadDefault	
+	printf "%-50s" "Starting $NAME..."
+	countNodes
+	
+	if [ "$NODES" -lt "$MAX_NODES" ]; then	
+		
+		NEXT_PIDFILE=`date +%s`
+		PID_FILE=$ES_RUN/$NEXT_PIDFILE.pid
+		$DAEMON -d -p $PID_FILE > /dev/null 2>&1 		
+		sleep 5
+		if [ -f $PID_FILE ]; then
+			PID=`cat $PID_FILE`
+                        printf "%s\n" "[OK] (pid=$PID)"
+			exit 0
+                else
+                        printf "%s\n" "[Fail] See logs ($ES_LOGS) for more details"
+			exit 1
+                fi
+	else 
+		printf "%s\n" "[Fail] $NODES Nodes (instances) of $NAME already running"
+		exit 2
+	fi
+
+;;
+status)
+	
+	printf "%-50s" "Checking $NAME..."
+	countNodes
+	
+	if [ "$NODES" -eq 0 ]; then
+		printf "%s\n" "Service not running"
+	else		
+		printf "%s\n" "$NODES Nodes running"
+
+	        for f in $(find $ES_RUN -type f); do
+			PID=`cat $f`;
+			printf "%-50s" ""
+			printf "%s\n" "NODE PID=$PID"			
+		done
+
+	fi
+;;
+stop)
+	
+	printf "%-50s" "Stopping $NAME..."
+	printf "\n"
+        
+	for f in $(find $ES_RUN -type f); do 
+
+		PID=`cat $f`;	
+		kill $PID
+		printf "%s\n" "Process $PID killed"
+		sleep 1
+	done
+	exit 0;
+;;
+
+restart)
+  	$0 stop
+  	$0 start
+;;
+
+*)
+        echo "Usage: $0 {status|start|stop|restart}"
+        exit 1
+esac
+exit $?
